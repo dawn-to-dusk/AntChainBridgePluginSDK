@@ -4,7 +4,7 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
     <groupId>org.eth</groupId>
-    <artifactId>simple-ethereum-bbc</artifactId>
+    <artifactId>eos-bbc</artifactId>
     <version>0.1-SNAPSHOT</version>
 
     <properties>
@@ -25,17 +25,31 @@
             <version>0.1-SNAPSHOT</version>
             <scope>provided</scope>
         </dependency>
+
         <dependency>
-            <groupId>org.web3j</groupId>
-            <artifactId>core</artifactId>
-            <version>4.9.4</version>
-            <exclusions>
-                <exclusion>
-                    <groupId>org.slf4j</groupId>
-                    <artifactId>slf4j-api</artifactId>
-                </exclusion>
-            </exclusions>
+            <groupId>one.block</groupId>
+            <artifactId>eosiojava</artifactId>
+            <version>1.0.0</version>
         </dependency>
+
+        <dependency>
+            <groupId>one.block</groupId>
+            <artifactId>eosiojavasoftkeysignatureprovider</artifactId>
+            <version>1.0.0</version>
+        </dependency>
+
+        <dependency>
+            <groupId>one.block</groupId>
+            <artifactId>eosio-java-abieos-serialization-provider</artifactId>
+            <version>1.0.0</version>
+        </dependency>
+
+        <dependency>
+            <groupId>one.block</groupId>
+            <artifactId>eosio-java-rpc-provider</artifactId>
+            <version>1.0.0</version>
+        </dependency>
+
         <dependency>
             <groupId>org.slf4j</groupId>
             <artifactId>slf4j-api</artifactId>
@@ -49,10 +63,27 @@
             <scope>test</scope>
         </dependency>
         <dependency>
-            <groupId>org.projectlombok</groupId>
-            <artifactId>lombok</artifactId>
-            <version>RELEASE</version>
-            <scope>compile</scope>
+            <groupId>one.block</groupId>
+            <artifactId>eosiojava</artifactId>
+            <version>1.0.0</version>
+        </dependency>
+
+        <dependency>
+            <groupId>one.block</groupId>
+            <artifactId>eosiojavasoftkeysignatureprovider</artifactId>
+            <version>1.0.0</version>
+        </dependency>
+
+        <dependency>
+            <groupId>one.block</groupId>
+            <artifactId>eosio-java-abieos-serialization-provider</artifactId>
+            <version>1.0.0</version>
+        </dependency>
+
+        <dependency>
+            <groupId>one.block</groupId>
+            <artifactId>eosio-java-rpc-provider</artifactId>
+            <version>1.0.0</version>
         </dependency>
     </dependencies>
 
