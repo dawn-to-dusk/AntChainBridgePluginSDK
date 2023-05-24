@@ -11,7 +11,15 @@
         <maven.compiler.source>8</maven.compiler.source>
         <maven.compiler.target>8</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <eosiojava.version>1.0.0</eosiojava.version>
     </properties>
+
+    <repositories>
+        <repository>
+            <id>jitpack.io</id>
+            <url>https://jitpack.io</url>
+        </repository>
+    </repositories>
 
     <dependencies>
         <dependency>
@@ -29,25 +37,31 @@
         <dependency>
             <groupId>one.block</groupId>
             <artifactId>eosiojava</artifactId>
-            <version>1.0.0</version>
+            <version>${eosiojava.version}</version>
         </dependency>
 
         <dependency>
             <groupId>one.block</groupId>
             <artifactId>eosiojavasoftkeysignatureprovider</artifactId>
-            <version>1.0.0</version>
+            <version>${eosiojava.version}</version>
         </dependency>
 
         <dependency>
             <groupId>one.block</groupId>
             <artifactId>eosio-java-abieos-serialization-provider</artifactId>
-            <version>1.0.0</version>
+            <version>${eosiojava.version}</version>
         </dependency>
 
         <dependency>
             <groupId>one.block</groupId>
             <artifactId>eosio-java-rpc-provider</artifactId>
-            <version>1.0.0</version>
+            <version>${eosiojava.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>com.github.EOSEssentials</groupId>
+            <artifactId>eos-java-rpc-wrapper</artifactId>
+            <version>master</version>
         </dependency>
 
         <dependency>
@@ -84,6 +98,12 @@
             <groupId>one.block</groupId>
             <artifactId>eosio-java-rpc-provider</artifactId>
             <version>1.0.0</version>
+        </dependency>
+
+        <dependency>
+            <groupId>com.squareup.okhttp3</groupId>
+            <artifactId>okhttp</artifactId>
+            <version>4.9.0</version>
         </dependency>
     </dependencies>
 

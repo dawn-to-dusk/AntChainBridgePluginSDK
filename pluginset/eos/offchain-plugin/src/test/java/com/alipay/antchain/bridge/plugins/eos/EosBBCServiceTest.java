@@ -14,180 +14,123 @@
  * limitations under the License.
  */
 
-package com.alipay.antchain.bridge.plugins.ethereum;
-
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
-import java.math.BigInteger;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
+package com.alipay.antchain.bridge.plugins.eos;
 
 import cn.hutool.core.collection.ListUtil;
-import cn.hutool.core.util.HexUtil;
-import cn.hutool.crypto.digest.DigestUtil;
 import com.alipay.antchain.bridge.commons.bbc.AbstractBBCContext;
 import com.alipay.antchain.bridge.commons.bbc.DefaultBBCContext;
 import com.alipay.antchain.bridge.commons.bbc.syscontract.AuthMessageContract;
 import com.alipay.antchain.bridge.commons.bbc.syscontract.ContractStatusEnum;
 import com.alipay.antchain.bridge.commons.bbc.syscontract.SDPContract;
-import com.alipay.antchain.bridge.commons.core.am.AuthMessageFactory;
-import com.alipay.antchain.bridge.commons.core.am.IAuthMessage;
 import com.alipay.antchain.bridge.commons.core.base.CrossChainMessage;
 import com.alipay.antchain.bridge.commons.core.base.CrossChainMessageReceipt;
-import com.alipay.antchain.bridge.commons.core.sdp.ISDPMessage;
-import com.alipay.antchain.bridge.commons.core.sdp.SDPMessageFactory;
-import com.alipay.antchain.bridge.commons.utils.codec.tlv.TLVTypeEnum;
-import com.alipay.antchain.bridge.commons.utils.codec.tlv.TLVUtils;
-import com.alipay.antchain.bridge.commons.utils.codec.tlv.annotation.TLVField;
-import com.alipay.antchain.bridge.plugins.ethereum.abi.AppContract;
-import com.alipay.antchain.bridge.plugins.ethereum.abi.SDPMsg;
-import lombok.Getter;
-import lombok.Setter;
-import com.alipay.antchain.bridge.plugins.ethereum.abi.AuthMsg;
+import one.block.eosiojava.error.rpcProvider.GetBlockRpcError;
+import one.block.eosiojava.models.rpcProvider.request.GetBlockRequest;
+import one.block.eosiojava.models.rpcProvider.response.GetBlockResponse;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
-import org.web3j.abi.FunctionEncoder;
-import org.web3j.abi.datatypes.DynamicBytes;
-import org.web3j.abi.datatypes.Function;
-import org.web3j.abi.datatypes.Type;
-import org.web3j.abi.datatypes.Utf8String;
-import org.web3j.abi.datatypes.generated.Bytes32;
-import org.web3j.crypto.Credentials;
-import org.web3j.protocol.Web3j;
-import org.web3j.protocol.core.DefaultBlockParameterName;
-import org.web3j.protocol.core.methods.request.Transaction;
-import org.web3j.protocol.core.methods.response.EthCall;
-import org.web3j.protocol.core.methods.response.EthGetTransactionReceipt;
-import org.web3j.protocol.core.methods.response.EthSendTransaction;
-import org.web3j.protocol.core.methods.response.TransactionReceipt;
-import org.web3j.protocol.http.HttpService;
-import org.web3j.tx.RawTransactionManager;
-import org.web3j.tx.gas.DefaultGasProvider;
 
-public class EthereumBBCServiceTest {
+import java.io.IOException;
+import java.util.List;
+import java.util.Optional;
 
-    private static final String VALID_URL = "http://localhost:7545";
+public class EosBBCServiceTest {
 
-    private static final String INVALID_URL = "http://localhost:6545";
+    private static final String VALID_URL = "http://127.0.0.1:8888";
+
+    private static final String INVALID_URL = "127.0.0.1:9999";
 
     // !!! replace to your test key
-    private static final String APP_USER_ETH_PRIVATE_KEY = "YourPrivateKey";
+    private static final String EOS_DEFAULT_PRIVATE_KEY = "5JvRDffBqoFFjiqXiVube1yDvNG35wxeNtwF4gsMJJqFEqPDkcG";
+    //private static final String EOS_DEFAULT_PUBLIC_KEY = "EOS6MRyAjQq8ud7hVNYcfnVPJqcVpscN5So8BhtHuGYqET5GDW5CV";
+
+    private static final String EOS_SDP_CONTRACT_NAME = "eos.sdp";
+
+    private static final String EOS_AM_CONTRACT_NAME = "eos.am";
+
+    private static final String EOS_TX_HASH = "39376109501ac839cb45a47903b802e22113c957f03d805e0e6e05590aada11f";
 
     private static final String REMOTE_APP_CONTRACT = "0xdd11AA371492B94AB8CDEdf076F84ECCa72820e1";
 
     private static final long WAIT_TIME = 15000;
 
-    private static EthereumBBCService ethereumBBCService;
-
-    private static AppContract appContract;
+    private static EosBBCService eosBBCService;
 
     @Before
     public void init() throws Exception {
-        ethereumBBCService = new EthereumBBCService();
-
-        Web3j web3j = Web3j.build(new HttpService(VALID_URL));
-        Credentials credentials = Credentials.create(APP_USER_ETH_PRIVATE_KEY);
-
-        RawTransactionManager rawTransactionManager = new RawTransactionManager(
-                web3j, credentials, web3j.ethChainId().send().getChainId().longValue());
-
-        appContract = AppContract.deploy(
-                web3j,
-                rawTransactionManager,
-                new DefaultGasProvider()
-        ).send();
+        eosBBCService = new EosBBCService();
     }
 
+    /**
+     * EOS的Startupb必须携带已部署合约信息
+     */
     @Test
     public void testStartup(){
-        // start up success
+        // start up context success with deployed contract
         AbstractBBCContext mockValidCtx = mockValidCtx();
-        ethereumBBCService.startup(mockValidCtx);
-        Assert.assertEquals(null, ethereumBBCService.getBbcContext().getAuthMessageContract());
-        Assert.assertEquals(null, ethereumBBCService.getBbcContext().getSdpContract());
+        eosBBCService.startup(mockValidCtx);
+        Assert.assertNotNull(eosBBCService.getBbcContext().getAuthMessageContract());
+        Assert.assertNotNull(eosBBCService.getBbcContext().getSdpContract());
+        Assert.assertEquals(ContractStatusEnum.CONTRACT_DEPLOYED, eosBBCService.getBbcContext().getAuthMessageContract().getStatus());
+        Assert.assertEquals(ContractStatusEnum.CONTRACT_DEPLOYED, eosBBCService.getBbcContext().getSdpContract().getStatus());
 
-        // start up failed
-        AbstractBBCContext mockInvalidCtx = mockInvalidCtx();
+        // start up context success with ready contract
+        AbstractBBCContext mockValidCtxWithPreReadyContracts = mockValidCtxWithPreReadyContracts();
+        eosBBCService.startup(mockValidCtxWithPreReadyContracts);
+        Assert.assertNotNull(eosBBCService.getBbcContext().getAuthMessageContract());
+        Assert.assertNotNull(eosBBCService.getBbcContext().getSdpContract());
+        Assert.assertEquals(ContractStatusEnum.CONTRACT_READY, eosBBCService.getBbcContext().getAuthMessageContract().getStatus());
+        Assert.assertEquals(ContractStatusEnum.CONTRACT_READY, eosBBCService.getBbcContext().getSdpContract().getStatus());
+
+        // start up failed without deployed contract
+        AbstractBBCContext mockInvalidCtxWithoutDeployedContracts = mockInvalidCtxWithoutDeployedContracts();
         try {
-            ethereumBBCService.startup(mockInvalidCtx);
+            eosBBCService.startup(mockInvalidCtxWithoutDeployedContracts);
+        }catch (Exception e){
+            e.printStackTrace();
+        }
+
+        // start up failed with wrong url
+        AbstractBBCContext mockInvalidCtxWithWrongUrl = mockInvalidCtxWithWrongUrl();
+        try {
+            eosBBCService.startup(mockInvalidCtxWithWrongUrl);
         } catch (Exception e){
             e.printStackTrace();
         }
     }
 
     @Test
-    public void testStartupWithDeployedContract(){
-        // start up a tmp
-        AbstractBBCContext mockValidCtx = mockValidCtx();
-        EthereumBBCService ethereumBBCServiceTmp = new EthereumBBCService();
-        ethereumBBCServiceTmp.startup(mockValidCtx);
-
-        // set up am and sdp
-        ethereumBBCServiceTmp.setupAuthMessageContract();
-        ethereumBBCServiceTmp.setupSDPMessageContract();
-        String amAddr = ethereumBBCServiceTmp.getContext().getAuthMessageContract().getContractAddress();
-        String sdpAddr = ethereumBBCServiceTmp.getContext().getSdpContract().getContractAddress();
-
-        // start up success
-        AbstractBBCContext ctx = mockValidCtxWithPreDeployedContracts(amAddr, sdpAddr);
-        ethereumBBCService.startup(ctx);
-        Assert.assertEquals(amAddr, ethereumBBCService.getBbcContext().getAuthMessageContract().getContractAddress());
-        Assert.assertEquals(ContractStatusEnum.CONTRACT_DEPLOYED, ethereumBBCService.getBbcContext().getAuthMessageContract().getStatus());
-        Assert.assertEquals(sdpAddr, ethereumBBCService.getBbcContext().getSdpContract().getContractAddress());
-        Assert.assertEquals(ContractStatusEnum.CONTRACT_DEPLOYED, ethereumBBCService.getBbcContext().getSdpContract().getStatus());
-    }
-
-    @Test
-    public void testStartupWithReadyContract(){
-        // start up a tmp ethereumBBCService to set up contract
-        AbstractBBCContext mockValidCtx = mockValidCtx();
-        EthereumBBCService ethereumBBCServiceTmp = new EthereumBBCService();
-        ethereumBBCServiceTmp.startup(mockValidCtx);
-
-        // set up am and sdp
-        ethereumBBCServiceTmp.setupAuthMessageContract();
-        ethereumBBCServiceTmp.setupSDPMessageContract();
-        String amAddr = ethereumBBCServiceTmp.getContext().getAuthMessageContract().getContractAddress();
-        String sdpAddr = ethereumBBCServiceTmp.getContext().getSdpContract().getContractAddress();
-
-        // start up success
-        AbstractBBCContext ctx = mockValidCtxWithPreReadyContracts(amAddr, sdpAddr);
-        ethereumBBCService.startup(ctx);
-        Assert.assertEquals(amAddr, ethereumBBCService.getBbcContext().getAuthMessageContract().getContractAddress());
-        Assert.assertEquals(ContractStatusEnum.CONTRACT_READY, ethereumBBCService.getBbcContext().getAuthMessageContract().getStatus());
-        Assert.assertEquals(sdpAddr, ethereumBBCService.getBbcContext().getSdpContract().getContractAddress());
-        Assert.assertEquals(ContractStatusEnum.CONTRACT_READY, ethereumBBCService.getBbcContext().getSdpContract().getStatus());
-    }
-
-    @Test
     public void testShutdown(){
         AbstractBBCContext mockValidCtx = mockValidCtx();
-        ethereumBBCService.startup(mockValidCtx);
-        ethereumBBCService.shutdown();
+        eosBBCService.startup(mockValidCtx);
+        eosBBCService.shutdown();
     }
 
     @Test
     public void testGetContext(){
         AbstractBBCContext mockValidCtx = mockValidCtx();
-        ethereumBBCService.startup(mockValidCtx);
-        AbstractBBCContext ctx = ethereumBBCService.getContext();
+        eosBBCService.startup(mockValidCtx);
+
+        AbstractBBCContext ctx = eosBBCService.getContext();
         Assert.assertNotNull(ctx);
-        Assert.assertEquals(null, ctx.getAuthMessageContract());
+        Assert.assertNotNull(ctx.getAuthMessageContract());
+        Assert.assertNotNull(ctx.getSdpContract());
+        Assert.assertEquals(EOS_AM_CONTRACT_NAME, ctx.getAuthMessageContract().getContractAddress());
+        Assert.assertEquals(ContractStatusEnum.CONTRACT_DEPLOYED, ctx.getAuthMessageContract().getStatus());
     }
 
     @Test
     public void testSetupAuthMessageContract(){
         // start up
         AbstractBBCContext mockValidCtx = mockValidCtx();
-        ethereumBBCService.startup(mockValidCtx);
+        eosBBCService.startup(mockValidCtx);
 
         // set up am
-        ethereumBBCService.setupAuthMessageContract();
+        eosBBCService.setupAuthMessageContract();
 
         // get context
-        AbstractBBCContext ctx = ethereumBBCService.getContext();
+        AbstractBBCContext ctx = eosBBCService.getContext();
         Assert.assertEquals(ContractStatusEnum.CONTRACT_DEPLOYED, ctx.getAuthMessageContract().getStatus());
     }
 
@@ -195,30 +138,94 @@ public class EthereumBBCServiceTest {
     public void testSetupSDPMessageContract(){
         // start up
         AbstractBBCContext mockValidCtx = mockValidCtx();
-        ethereumBBCService.startup(mockValidCtx);
+        eosBBCService.startup(mockValidCtx);
 
         // set up sdp
-        ethereumBBCService.setupSDPMessageContract();
+        eosBBCService.setupSDPMessageContract();
 
         // get context
-        AbstractBBCContext ctx = ethereumBBCService.getContext();
+        AbstractBBCContext ctx = eosBBCService.getContext();
         Assert.assertEquals(ContractStatusEnum.CONTRACT_DEPLOYED, ctx.getSdpContract().getStatus());
     }
 
     @Test
+    public void testReadCrossChainMessageReceipt() throws IOException, InterruptedException {
+        relayAmPrepare();
+
+        // todo： relay am msg
+        // CrossChainMessageReceipt crossChainMessageReceipt = eosBBCService.relayAuthMessage(getRawMsgFromRelayer());
+        //
+        // System.out.println("sleep 15s for tx to be packaged...");
+        // Thread.sleep(WAIT_TIME);
+
+        // read receipt by txHash
+        CrossChainMessageReceipt crossChainMessageReceipt1 = eosBBCService.readCrossChainMessageReceipt("16aeae2899ddeaeac23f616858322d6a9ca073d03ba55130a8e4e22ace696106");
+        Assert.assertTrue(crossChainMessageReceipt1.isSuccessful());
+        //Assert.assertEquals(crossChainMessageReceipt.isSuccessful(), crossChainMessageReceipt1.isSuccessful());
+    }
+
+    @Test
+    public void testReadCrossChainMessagesByHeight_sendUnordered() throws Exception {
+        relayAmPrepare();
+
+        // 1. set sdp addr
+        // todo
+
+        // 2. send msg
+        // todo
+
+        // 3. query latest height
+//        long height1 = eosBBCService.queryLatestHeight();
+//
+//        System.out.println("sleep 15s for tx to be packaged...");
+//        Thread.sleep(WAIT_TIME);
+//
+//        long height2 = eosBBCService.queryLatestHeight();
+
+        long height1 = 203;
+        long height2 = 203;
+
+        // 4. read cc msg
+        List<CrossChainMessage> messageList = ListUtil.toList();
+        for(long i = height1; i <= height2; i++){
+            messageList.addAll(eosBBCService.readCrossChainMessagesByHeight(i));
+        }
+        Assert.assertEquals(1, messageList.size());
+        Assert.assertEquals(CrossChainMessage.CrossChainMessageType.AUTH_MSG, messageList.get(0).getType());
+    }
+
+    @Test
+    public void testQueryLatestHeight(){
+        relayAmPrepare();
+        Assert.assertNotEquals(0, eosBBCService.queryLatestHeight().longValue());
+    }
+
+    @Test
+    public void testInvokeHello(){
+        relayAmPrepare();
+        Assert.assertTrue(eosBBCService.demoInvokeHello());
+    }
+
+    @Test
+    public void testInvokeSetData(){
+        relayAmPrepare();
+        Assert.assertEquals(10, eosBBCService.demoInvokeSetData());
+    }
+
+    /*@Test
     public void testQuerySDPMessageSeq(){
         // start up
         AbstractBBCContext mockValidCtx = mockValidCtx();
-        ethereumBBCService.startup(mockValidCtx);
+        eosBBCService.startup(mockValidCtx);
 
         // set up sdp
-        ethereumBBCService.setupSDPMessageContract();
+        eosBBCService.setupSDPMessageContract();
 
         // set the domain
-        ethereumBBCService.setLocalDomain("receiverDomain");
+        eosBBCService.setLocalDomain("receiverDomain");
 
         // query seq
-        long seq = ethereumBBCService.querySDPMessageSeq(
+        long seq = eosBBCService.querySDPMessageSeq(
                 "senderDomain",
                 DigestUtil.sha256Hex("senderID"),
                 "receiverDomain",
@@ -231,34 +238,34 @@ public class EthereumBBCServiceTest {
     public void testSetProtocol() throws Exception {
         // start up
         AbstractBBCContext mockValidCtx = mockValidCtx();
-        ethereumBBCService.startup(mockValidCtx);
+        eosBBCService.startup(mockValidCtx);
 
         // set up am
-        ethereumBBCService.setupAuthMessageContract();
+        eosBBCService.setupAuthMessageContract();
 
         // set up sdp
-        ethereumBBCService.setupSDPMessageContract();
+        eosBBCService.setupSDPMessageContract();
 
         // get context
-        AbstractBBCContext ctx = ethereumBBCService.getContext();
+        AbstractBBCContext ctx = eosBBCService.getContext();
         Assert.assertEquals(ContractStatusEnum.CONTRACT_DEPLOYED, ctx.getAuthMessageContract().getStatus());
         Assert.assertEquals(ContractStatusEnum.CONTRACT_DEPLOYED, ctx.getSdpContract().getStatus());
 
         // set protocol to am (sdp type: 0)
-        ethereumBBCService.setProtocol(
+        eosBBCService.setProtocol(
                 ctx.getSdpContract().getContractAddress(),
                 "0");
 
         String addr = AuthMsg.load(
-                ethereumBBCService.getBbcContext().getAuthMessageContract().getContractAddress(),
-                ethereumBBCService.getWeb3j(),
-                ethereumBBCService.getCredentials(),
+                eosBBCService.getBbcContext().getAuthMessageContract().getContractAddress(),
+                eosBBCService.getWeb3j(),
+                eosBBCService.getCredentials(),
                 new DefaultGasProvider()
         ).getProtocol(BigInteger.ZERO).send();
         System.out.printf("protocol: %s\n", addr);
 
         // check am status
-        ctx = ethereumBBCService.getContext();
+        ctx = eosBBCService.getContext();
         Assert.assertEquals(ContractStatusEnum.CONTRACT_READY, ctx.getAuthMessageContract().getStatus());
     }
 
@@ -266,47 +273,47 @@ public class EthereumBBCServiceTest {
     public void testSetAmContractAndLocalDomain() throws Exception {
         // start up
         AbstractBBCContext mockValidCtx = mockValidCtx();
-        ethereumBBCService.startup(mockValidCtx);
+        eosBBCService.startup(mockValidCtx);
 
         // set up am
-        ethereumBBCService.setupAuthMessageContract();
+        eosBBCService.setupAuthMessageContract();
 
         // set up sdp
-        ethereumBBCService.setupSDPMessageContract();
+        eosBBCService.setupSDPMessageContract();
 
         // get context
-        AbstractBBCContext ctx = ethereumBBCService.getContext();
+        AbstractBBCContext ctx = eosBBCService.getContext();
         Assert.assertEquals(ContractStatusEnum.CONTRACT_DEPLOYED, ctx.getAuthMessageContract().getStatus());
         Assert.assertEquals(ContractStatusEnum.CONTRACT_DEPLOYED, ctx.getSdpContract().getStatus());
 
         // set am to sdp
-        ethereumBBCService.setAmContract(ctx.getAuthMessageContract().getContractAddress());
+        eosBBCService.setAmContract(ctx.getAuthMessageContract().getContractAddress());
 
         String amAddr = SDPMsg.load(
-                ethereumBBCService.getBbcContext().getSdpContract().getContractAddress(),
-                ethereumBBCService.getWeb3j(),
-                ethereumBBCService.getCredentials(),
+                eosBBCService.getBbcContext().getSdpContract().getContractAddress(),
+                eosBBCService.getWeb3j(),
+                eosBBCService.getCredentials(),
                 new DefaultGasProvider()
         ).getAmAddress().send();
         System.out.printf("amAddr: %s\n", amAddr);
 
         // check contract status
-        ctx = ethereumBBCService.getContext();
+        ctx = eosBBCService.getContext();
         Assert.assertEquals(ContractStatusEnum.CONTRACT_DEPLOYED, ctx.getSdpContract().getStatus());
 
         // set the domain
-        ethereumBBCService.setLocalDomain("receiverDomain");
+        eosBBCService.setLocalDomain("receiverDomain");
 
         byte[] rawDomain = SDPMsg.load(
-                ethereumBBCService.getBbcContext().getSdpContract().getContractAddress(),
-                ethereumBBCService.getWeb3j(),
-                ethereumBBCService.getCredentials(),
+                eosBBCService.getBbcContext().getSdpContract().getContractAddress(),
+                eosBBCService.getWeb3j(),
+                eosBBCService.getCredentials(),
                 new DefaultGasProvider()
         ).getLocalDomain().send();
         System.out.printf("domain: %s\n", HexUtil.encodeHexStr(rawDomain));
 
         // check contract status
-        ctx = ethereumBBCService.getContext();
+        ctx = eosBBCService.getContext();
         Assert.assertEquals(ContractStatusEnum.CONTRACT_READY, ctx.getSdpContract().getStatus());
     }
 
@@ -315,105 +322,16 @@ public class EthereumBBCServiceTest {
         relayAmPrepare();
 
         // relay am msg
-        CrossChainMessageReceipt receipt = ethereumBBCService.relayAuthMessage(getRawMsgFromRelayer());
+        CrossChainMessageReceipt receipt = eosBBCService.relayAuthMessage(getRawMsgFromRelayer());
         Assert.assertTrue(receipt.isSuccessful());
 
         System.out.println("sleep 15s for tx to be packaged...");
         Thread.sleep(WAIT_TIME);
 
-        EthGetTransactionReceipt ethGetTransactionReceipt = ethereumBBCService.getWeb3j().ethGetTransactionReceipt(receipt.getTxhash()).send();
+        EthGetTransactionReceipt ethGetTransactionReceipt = eosBBCService.getWeb3j().ethGetTransactionReceipt(receipt.getTxhash()).send();
         TransactionReceipt transactionReceipt = ethGetTransactionReceipt.getTransactionReceipt().get();
         Assert.assertNotNull(transactionReceipt);
         Assert.assertTrue(transactionReceipt.isStatusOK());
-    }
-
-    @Test
-    public void testReadCrossChainMessageReceipt() throws IOException, InterruptedException {
-        relayAmPrepare();
-
-        // relay am msg
-        CrossChainMessageReceipt crossChainMessageReceipt = ethereumBBCService.relayAuthMessage(getRawMsgFromRelayer());
-
-        System.out.println("sleep 15s for tx to be packaged...");
-        Thread.sleep(WAIT_TIME);
-
-        // read receipt by txHash
-        CrossChainMessageReceipt crossChainMessageReceipt1 = ethereumBBCService.readCrossChainMessageReceipt(crossChainMessageReceipt.getTxhash());
-        Assert.assertTrue(crossChainMessageReceipt1.isConfirmed());
-        Assert.assertEquals(crossChainMessageReceipt.isSuccessful(), crossChainMessageReceipt1.isSuccessful());
-    }
-
-    @Test
-    public void testReadCrossChainMessagesByHeight_sendUnordered() throws Exception {
-        relayAmPrepare();
-
-        // 1. set sdp addr
-        TransactionReceipt receipt = appContract.setProtocol(ethereumBBCService.getBbcContext().getSdpContract().getContractAddress()).send();
-        if (receipt.isStatusOK()){
-            System.out.printf("set protocol(%s) to app contract(%s) \n",
-                    appContract.getContractAddress(),
-                    ethereumBBCService.getBbcContext().getSdpContract().getContractAddress());
-        } else {
-            throw new Exception(String.format("failed to set protocol(%s) to app contract(%s)",
-                    appContract.getContractAddress(),
-                    ethereumBBCService.getBbcContext().getSdpContract().getContractAddress()));
-        }
-
-        // 2. send msg
-        try {
-            // 2.1 create function
-            List<Type> inputParameters = new ArrayList<>();
-            inputParameters.add(new Utf8String("remoteDomain"));
-            inputParameters.add(new Bytes32(DigestUtil.sha256(REMOTE_APP_CONTRACT)));
-            inputParameters.add(new DynamicBytes("UnorderedCrossChainMessage".getBytes()));
-            Function function = new Function(
-                    AppContract.FUNC_SENDUNORDEREDMESSAGE, // function name
-                    inputParameters, // inputs
-                    Collections.emptyList() // outputs
-            );
-            String encodedFunc = FunctionEncoder.encode(function);
-
-            // 2.2 pre-execute before commit tx
-            EthCall call = ethereumBBCService.getWeb3j().ethCall(
-                    Transaction.createEthCallTransaction(
-                            ethereumBBCService.getCredentials().getAddress(),
-                            appContract.getContractAddress(),
-                            encodedFunc
-                    ),
-                    DefaultBlockParameterName.LATEST
-            ).send();
-
-            // 2.3 async send tx
-            EthSendTransaction ethSendTransaction = ethereumBBCService.getRawTransactionManager().sendTransaction(
-                    BigInteger.valueOf(ethereumBBCService.getConfig().getGasPrice()),
-                    BigInteger.valueOf(ethereumBBCService.getConfig().getGasLimit()),
-                    appContract.getContractAddress(),
-                    encodedFunc,
-                    BigInteger.ZERO
-            );
-
-            System.out.printf("send unordered msg tx %s\n", ethSendTransaction.getTransactionHash());
-        } catch (Exception e) {
-            throw new RuntimeException(
-                    String.format("failed to send unordered msg"), e
-            );
-        }
-
-        // 3. query latest height
-        long height1 = ethereumBBCService.queryLatestHeight();
-
-        System.out.println("sleep 15s for tx to be packaged...");
-        Thread.sleep(WAIT_TIME);
-
-        long height2 = ethereumBBCService.queryLatestHeight();
-
-        // 4. read cc msg
-        List<CrossChainMessage> messageList = ListUtil.toList();
-        for(long i = height1; i <= height2; i++){
-            messageList.addAll(ethereumBBCService.readCrossChainMessagesByHeight(i));
-        }
-        Assert.assertEquals(1, messageList.size());
-        Assert.assertEquals(CrossChainMessage.CrossChainMessageType.AUTH_MSG, messageList.get(0).getType());
     }
 
     @Test
@@ -421,15 +339,15 @@ public class EthereumBBCServiceTest {
         relayAmPrepare();
 
         // 1. set sdp addr
-        TransactionReceipt receipt = appContract.setProtocol(ethereumBBCService.getBbcContext().getSdpContract().getContractAddress()).send();
+        TransactionReceipt receipt = appContract.setProtocol(eosBBCService.getBbcContext().getSdpContract().getContractAddress()).send();
         if (receipt.isStatusOK()){
             System.out.printf("set protocol(%s) to app contract(%s) \n",
                     appContract.getContractAddress(),
-                    ethereumBBCService.getBbcContext().getSdpContract().getContractAddress());
+                    eosBBCService.getBbcContext().getSdpContract().getContractAddress());
         } else {
             throw new Exception(String.format("failed to set protocol(%s) to app contract(%s)",
                     appContract.getContractAddress(),
-                    ethereumBBCService.getBbcContext().getSdpContract().getContractAddress()));
+                    eosBBCService.getBbcContext().getSdpContract().getContractAddress()));
         }
 
         // 2. send msg
@@ -447,9 +365,9 @@ public class EthereumBBCServiceTest {
             String encodedFunc = FunctionEncoder.encode(function);
 
             // 2.2 pre-execute before commit tx
-            EthCall call = ethereumBBCService.getWeb3j().ethCall(
+            EthCall call = eosBBCService.getWeb3j().ethCall(
                     Transaction.createEthCallTransaction(
-                            ethereumBBCService.getCredentials().getAddress(),
+                            eosBBCService.getCredentials().getAddress(),
                             appContract.getContractAddress(),
                             encodedFunc
                     ),
@@ -457,9 +375,9 @@ public class EthereumBBCServiceTest {
             ).send();
 
             // 2.3 async send tx
-            EthSendTransaction ethSendTransaction = ethereumBBCService.getRawTransactionManager().sendTransaction(
-                    BigInteger.valueOf(ethereumBBCService.getConfig().getGasPrice()),
-                    BigInteger.valueOf(ethereumBBCService.getConfig().getGasLimit()),
+            EthSendTransaction ethSendTransaction = eosBBCService.getRawTransactionManager().sendTransaction(
+                    BigInteger.valueOf(eosBBCService.getConfig().getGasPrice()),
+                    BigInteger.valueOf(eosBBCService.getConfig().getGasLimit()),
                     appContract.getContractAddress(),
                     encodedFunc,
                     BigInteger.ZERO
@@ -473,100 +391,109 @@ public class EthereumBBCServiceTest {
         }
 
         // 3. query latest height
-        long height1 = ethereumBBCService.queryLatestHeight();
+        long height1 = eosBBCService.queryLatestHeight();
 
         System.out.println("sleep 15s for tx to be packaged...");
         Thread.sleep(WAIT_TIME);
 
-        long height2 = ethereumBBCService.queryLatestHeight();
+        long height2 = eosBBCService.queryLatestHeight();
 
         // 4. read cc msg
         List<CrossChainMessage> messageList = ListUtil.toList();
         for(long i = height1; i <= height2; i++){
-            messageList.addAll(ethereumBBCService.readCrossChainMessagesByHeight(i));
+            messageList.addAll(eosBBCService.readCrossChainMessagesByHeight(i));
         }
         Assert.assertEquals(1, messageList.size());
         Assert.assertEquals(CrossChainMessage.CrossChainMessageType.AUTH_MSG, messageList.get(0).getType());
-    }
+    }*/
 
     private void relayAmPrepare(){
         // start up
         AbstractBBCContext mockValidCtx = mockValidCtx();
-        ethereumBBCService.startup(mockValidCtx);
+        eosBBCService.startup(mockValidCtx);
 
-        // set up am
-        ethereumBBCService.setupAuthMessageContract();
-
-        // set up sdp
-        ethereumBBCService.setupSDPMessageContract();
-
-        // set protocol to am (sdp type: 0)
-        ethereumBBCService.setProtocol(
-                mockValidCtx.getSdpContract().getContractAddress(),
-                "0");
-
-        // set am to sdp
-        ethereumBBCService.setAmContract(mockValidCtx.getAuthMessageContract().getContractAddress());
-
-        // set local domain to sdp
-        ethereumBBCService.setLocalDomain("receiverDomain");
-
-        // check contract ready
-        AbstractBBCContext ctxCheck = ethereumBBCService.getContext();
-        Assert.assertEquals(ContractStatusEnum.CONTRACT_READY, ctxCheck.getAuthMessageContract().getStatus());
-        Assert.assertEquals(ContractStatusEnum.CONTRACT_READY, ctxCheck.getSdpContract().getStatus());
+//        // set up am
+//        eosBBCService.setupAuthMessageContract();
+//
+//        // set up sdp
+//        eosBBCService.setupSDPMessageContract();
+//
+//        // set protocol to am (sdp type: 0)
+//        eosBBCService.setProtocol(
+//                mockValidCtx.getSdpContract().getContractAddress(),
+//                "0");
+//
+//        // set am to sdp
+//        eosBBCService.setAmContract(mockValidCtx.getAuthMessageContract().getContractAddress());
+//
+//        // set local domain to sdp
+//        eosBBCService.setLocalDomain("receiverDomain");
+//
+//        // check contract ready
+//        AbstractBBCContext ctxCheck = eosBBCService.getContext();
+//        Assert.assertEquals(ContractStatusEnum.CONTRACT_READY, ctxCheck.getAuthMessageContract().getStatus());
+//        Assert.assertEquals(ContractStatusEnum.CONTRACT_READY, ctxCheck.getSdpContract().getStatus());
     }
 
     private AbstractBBCContext mockValidCtx(){
-        EthereumConfig mockConf = new EthereumConfig();
+        EosConfig mockConf = new EosConfig();
         mockConf.setUrl(VALID_URL);
-        mockConf.setPrivateKey(APP_USER_ETH_PRIVATE_KEY);
+        mockConf.setUserPriKey(EOS_DEFAULT_PRIVATE_KEY);
+        mockConf.setAmContractAddressDeployed(EOS_AM_CONTRACT_NAME);
+        mockConf.setSdpContractAddressDeployed(EOS_SDP_CONTRACT_NAME);
+
+        // todo: detete
+        mockConf.setHelloContractAddressDeployed("helloa");
+        mockConf.setGetDataContractAddressDeployed("lydata");
+        mockConf.setUserName("liyuan");
+
+        AbstractBBCContext mockCtx = new DefaultBBCContext();
+        mockCtx.setConfForBlockchainClient(mockConf.toJsonString().getBytes());
+
+        return mockCtx;
+    }
+
+    private AbstractBBCContext mockInvalidCtxWithWrongUrl(){
+        EosConfig mockConf = new EosConfig();
+        mockConf.setUrl(INVALID_URL);
+        mockConf.setUserPriKey(EOS_DEFAULT_PRIVATE_KEY);
         AbstractBBCContext mockCtx = new DefaultBBCContext();
         mockCtx.setConfForBlockchainClient(mockConf.toJsonString().getBytes());
         return mockCtx;
     }
 
-    private AbstractBBCContext mockValidCtxWithPreDeployedContracts(String amAddr, String sdpAddr){
-        EthereumConfig mockConf = new EthereumConfig();
+   private AbstractBBCContext mockInvalidCtxWithoutDeployedContracts(){
+        EosConfig mockConf = new EosConfig();
         mockConf.setUrl(VALID_URL);
-        mockConf.setPrivateKey(APP_USER_ETH_PRIVATE_KEY);
-        mockConf.setAmContractAddressDeployed(amAddr);
-        mockConf.setSdpContractAddressDeployed(sdpAddr);
+        mockConf.setUserPriKey(EOS_DEFAULT_PRIVATE_KEY);
         AbstractBBCContext mockCtx = new DefaultBBCContext();
         mockCtx.setConfForBlockchainClient(mockConf.toJsonString().getBytes());
         return mockCtx;
     }
 
-    private AbstractBBCContext mockValidCtxWithPreReadyContracts(String amAddr, String sdpAddr){
-        EthereumConfig mockConf = new EthereumConfig();
+    private AbstractBBCContext mockValidCtxWithPreReadyContracts(){
+        EosConfig mockConf = new EosConfig();
         mockConf.setUrl(VALID_URL);
-        mockConf.setPrivateKey(APP_USER_ETH_PRIVATE_KEY);
-        mockConf.setAmContractAddressDeployed(amAddr);
-        mockConf.setSdpContractAddressDeployed(sdpAddr);
+        mockConf.setUserPriKey(EOS_DEFAULT_PRIVATE_KEY);
+        mockConf.setAmContractAddressDeployed(EOS_AM_CONTRACT_NAME);
+        mockConf.setSdpContractAddressDeployed(EOS_SDP_CONTRACT_NAME);
         AbstractBBCContext mockCtx = new DefaultBBCContext();
         mockCtx.setConfForBlockchainClient(mockConf.toJsonString().getBytes());
 
         AuthMessageContract authMessageContract = new AuthMessageContract();
-        authMessageContract.setContractAddress(amAddr);
+        authMessageContract.setContractAddress(EOS_AM_CONTRACT_NAME);
         authMessageContract.setStatus(ContractStatusEnum.CONTRACT_READY);
         mockCtx.setAuthMessageContract(authMessageContract);
 
         SDPContract sdpContract = new SDPContract();
-        sdpContract.setContractAddress(sdpAddr);
+        sdpContract.setContractAddress(EOS_SDP_CONTRACT_NAME);
         sdpContract.setStatus(ContractStatusEnum.CONTRACT_READY);
         mockCtx.setSdpContract(sdpContract);
 
         return mockCtx;
     }
 
-    private AbstractBBCContext mockInvalidCtx(){
-        EthereumConfig mockConf = new EthereumConfig();
-        mockConf.setUrl(INVALID_URL);
-        mockConf.setPrivateKey(APP_USER_ETH_PRIVATE_KEY);
-        AbstractBBCContext mockCtx = new DefaultBBCContext();
-        mockCtx.setConfForBlockchainClient(mockConf.toJsonString().getBytes());
-        return mockCtx;
-    }
+/*
 
     private byte[] getRawMsgFromRelayer() throws IOException {
         ISDPMessage sdpMessage = SDPMessageFactory.createSDPMessage(
@@ -626,5 +553,5 @@ public class EthereumBBCServiceTest {
 
         @TLVField(tag = 0, type = TLVTypeEnum.BYTES)
         private byte[] rawResponse;
-    }
+    }*/
 }

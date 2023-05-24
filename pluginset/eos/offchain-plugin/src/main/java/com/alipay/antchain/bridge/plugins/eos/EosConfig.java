@@ -16,13 +16,12 @@
 
 package com.alipay.antchain.bridge.plugins.eos;
 
-import java.io.IOException;
-
 import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.annotation.JSONField;
 import lombok.Getter;
 import lombok.Setter;
-import org.web3j.tx.gas.DefaultGasProvider;
+
+import java.io.IOException;
 
 /**
  * Eos's configuration information
@@ -45,8 +44,12 @@ public class EosConfig {
     @JSONField
     private String url;
 
+    // todo: delete
     @JSONField
-    private String privateKey;
+    private String userName;     // 调用者账户名称
+
+    @JSONField
+    private String userPriKey;   // 调用者账户的私钥
 
     @JSONField
     private long gasLimit;
@@ -55,10 +58,16 @@ public class EosConfig {
     private long gasPrice;
 
     @JSONField
-    private String amContractAddressDeployed;
+    private String helloContractAddressDeployed;   // 合约账户名称 helloa
 
     @JSONField
-    private String sdpContractAddressDeployed;
+    private String getDataContractAddressDeployed;   // 合约账户名称 getDataa
+
+    @JSONField
+    private String amContractAddressDeployed;   // 合约账户名称 ama
+
+    @JSONField
+    private String sdpContractAddressDeployed;  // 合约账户名称 sdpa
 
     /**
      * json序列化为字符串
