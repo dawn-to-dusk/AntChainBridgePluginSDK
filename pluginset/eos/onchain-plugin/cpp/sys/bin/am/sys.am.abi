@@ -1,0 +1,202 @@
+{
+    "____comment": "This file was generated with eosio-abigen. DO NOT EDIT ",
+    "version": "eosio::abi/1.2",
+    "types": [],
+    "structs": [
+        {
+            "name": "addrelayer",
+            "base": "",
+            "fields": [
+                {
+                    "name": "invoker",
+                    "type": "name"
+                },
+                {
+                    "name": "relayer_account",
+                    "type": "name"
+                }
+            ]
+        },
+        {
+            "name": "crossing",
+            "base": "",
+            "fields": [
+                {
+                    "name": "invoker",
+                    "type": "name"
+                },
+                {
+                    "name": "msg",
+                    "type": "string"
+                }
+            ]
+        },
+        {
+            "name": "init",
+            "base": "",
+            "fields": [
+                {
+                    "name": "initializer",
+                    "type": "name"
+                }
+            ]
+        },
+        {
+            "name": "recvprotocol",
+            "base": "",
+            "fields": [
+                {
+                    "name": "invoker",
+                    "type": "name"
+                },
+                {
+                    "name": "sender_account",
+                    "type": "name"
+                },
+                {
+                    "name": "msg",
+                    "type": "string"
+                }
+            ]
+        },
+        {
+            "name": "recvrelayer",
+            "base": "",
+            "fields": [
+                {
+                    "name": "invoker",
+                    "type": "name"
+                },
+                {
+                    "name": "pkg",
+                    "type": "string"
+                }
+            ]
+        },
+        {
+            "name": "s_protocols_by_account",
+            "base": "",
+            "fields": [
+                {
+                    "name": "protocol_account",
+                    "type": "name"
+                },
+                {
+                    "name": "protocol_type",
+                    "type": "uint32"
+                }
+            ]
+        },
+        {
+            "name": "s_protocols_by_type",
+            "base": "",
+            "fields": [
+                {
+                    "name": "protocol_account",
+                    "type": "name"
+                },
+                {
+                    "name": "protocol_type",
+                    "type": "uint32"
+                }
+            ]
+        },
+        {
+            "name": "s_relayers",
+            "base": "",
+            "fields": [
+                {
+                    "name": "relayer",
+                    "type": "name"
+                }
+            ]
+        },
+        {
+            "name": "setprotocol",
+            "base": "",
+            "fields": [
+                {
+                    "name": "invoker",
+                    "type": "name"
+                },
+                {
+                    "name": "protocol_account",
+                    "type": "name"
+                },
+                {
+                    "name": "protocol_type",
+                    "type": "uint32"
+                }
+            ]
+        },
+        {
+            "name": "test2",
+            "base": "",
+            "fields": []
+        }
+    ],
+    "actions": [
+        {
+            "name": "addrelayer",
+            "type": "addrelayer",
+            "ricardian_contract": ""
+        },
+        {
+            "name": "crossing",
+            "type": "crossing",
+            "ricardian_contract": ""
+        },
+        {
+            "name": "init",
+            "type": "init",
+            "ricardian_contract": ""
+        },
+        {
+            "name": "recvprotocol",
+            "type": "recvprotocol",
+            "ricardian_contract": ""
+        },
+        {
+            "name": "recvrelayer",
+            "type": "recvrelayer",
+            "ricardian_contract": ""
+        },
+        {
+            "name": "setprotocol",
+            "type": "setprotocol",
+            "ricardian_contract": ""
+        },
+        {
+            "name": "test2",
+            "type": "test2",
+            "ricardian_contract": ""
+        }
+    ],
+    "tables": [
+        {
+            "name": "protaccount",
+            "type": "s_protocols_by_account",
+            "index_type": "i64",
+            "key_names": [],
+            "key_types": []
+        },
+        {
+            "name": "prottype",
+            "type": "s_protocols_by_type",
+            "index_type": "i64",
+            "key_names": [],
+            "key_types": []
+        },
+        {
+            "name": "relayerinfo",
+            "type": "s_relayers",
+            "index_type": "i64",
+            "key_names": [],
+            "key_types": []
+        }
+    ],
+    "kv_tables": {},
+    "ricardian_clauses": [],
+    "variants": [],
+    "action_results": []
+}

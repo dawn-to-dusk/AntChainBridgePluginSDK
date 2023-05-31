@@ -70,12 +70,14 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+import static cn.hutool.crypto.SecureUtil.sha256;
+
 @BBCService(products = "eos", pluginId = "plugin-eos")
 @Getter
 public class EosBBCService implements IBBCService {
 
-    // todo 跨链事件标识？
-    private static final String CROSSCHAIN_ACTION = "setcode";
+    // 跨链事件标识
+    private static final String CROSSCHAIN_ACTION = "crossing";
 
     // ============================== SDP合约信息常量 ==============================
     // sdp合约「有序消息seq表」：该表记录跨链四元组对应的有序消息的seq
@@ -89,46 +91,70 @@ public class EosBBCService implements IBBCService {
     // sdp合约「初始化信息表」：该表记录am合约账户和链的localdomain
     // - 表名
     private static final String SDP_INIT_INFO_TABLE = "sdpinitinfo";
-    // - 主键的key值：am/localdomain
-    private static final String SDP_INIT_INFO_TABLE_KEY_AM = "sdp_init_am";
-    private static final String SDP_INIT_INFO_TABLE_KEY_LOCALDOMAIN = "sdp_init_localdomain";
+    // - 主键的key值：固定为1
+    private static final String SDP_INIT_INFO_TABLE_KEY = "1";
     // - 主键的value名称
-    private static final String SDP_INIT_INFO_TABLE_VALUE_NAME = "sdp_init_account";
+    private static final String SDP_INIT_INFO_TABLE_VALUE_AM_NAME = "am_contract_account";
+    private static final String SDP_INIT_INFO_TABLE_VALUE_DOMAIN_NAME = "local_domain";
 
     // sdp合约中设置am合约账户的action
     // - 名称
-    private static final String SDP_SET_AM_CONTRACT_ACTION = "setamcontract";
+    private static final String SDP_SET_AM_CONTRACT_ACTION = "setam";
     // - 参数格式
     private static final String SDP_SET_AM_CONTRACT_PARAMETER_FORMAT = "{\n" +
+            "  \"invoker\": \"%s\"\n" +
             "  \"am_contract_account\": \"%s\"\n" +
             "}";
 
     // sdp合约中设置链localdomain的action
     // - 名称
-    private static final String SDP_SET_LOCALDOMAIN_ACTION = "setlocaldomain";
+    private static final String SDP_SET_LOCALDOMAIN_ACTION = "setdomain";
     // - 参数格式
     private static final String SDP_SET_LOCALDOMAIN_PARAMETER_FORMAT = "{\n" +
+            "  \"invoker\": \"%s\"\n" +
             "  \"local_domain\": \"%s\"\n" +
             "}";
 
     // ============================== AM合约信息常量 ==============================
-    // am合约「初始化信息表」：记录中继账户列表信息和上层协议账户列表信息
+    // am 中继信息表
     // - 表名
-    private static final String AM_INIT_INFO_TABLE = "aminitinfo";
-    // - 主键的key值：relayers / protocols
-    private static final String AM_INIT_INFO_TABLE_KEY_RELAYERS = "relayers";
-    private static final String AM_INIT_INFO_TABLE_KEY_PROTOCOLS = "protocols";
-    // - value名称
-    private static final String AM_INIT_INFO_TABLE_VALUE_NAME = "am_init_value";
+    private static final String AM_RELAYER_INFO_TABLE = "relayerinfo";
+    // - 主键的key值格式：relayer账户名称
+    private static final String AM_RELAYER_KEY_FORMAT = "%s";
 
-    // am合约「上层协议合约信息表」：记录上层协议类型到协议合约账户的映射
+    // am protocol信息表 account -> type
     // - 表名
-    private static final String AM_PROTOCOLS_TABLE = "protocols";
-    // - 主键的key格式：protocol类型  e.g. 0 (sdp)
-    private static final String AM_PROTOCOLS_TABLE_KEY_FORMAT = "%s";
-    private static final String AM_PROTOCOLS_TABLE_KEY_SDP = "0";
-    // - value名称
-    private static final String AM_PROTOCOLS_TABLE_VALUE_NAME = "protocol_account";
+    private static final String AM_PROTOCOL_ACCOUNT_TABLE = "protaccount";
+    // - 主键的key值格式：protocol账户名称
+    private static final String AM_PROTOCOL_ACCOUNT_KEY_FORMAT = "%s";
+    // - 主键的value名称
+    private static final String AM_PROTOCOL_ACCOUNT_VALUE_NAME = "protocol_type";
+
+    // am protocol信息表 type -> account
+    // - 表名
+    private static final String AM_PROTOCOL_TYPE_TABLE = "prottype";
+    // - 主键的key值格式：protocol账户名称
+    private static final String AM_PROTOCOL_TYPE_KEY_FORMAT = "%s";
+    // - 主键的value名称
+    private static final String AM_PROTOCOL_TYPE_VALUE_NAME = "protocol_account";
+
+//    // am合约「初始化信息表」：记录中继账户列表信息和上层协议账户列表信息
+//    // - 表名
+//    private static final String AM_INIT_INFO_TABLE = "aminitinfo";
+//    // - 主键的key值：relayers / protocols
+//    private static final String AM_INIT_INFO_TABLE_KEY_RELAYERS = "relayers";
+//    private static final String AM_INIT_INFO_TABLE_KEY_PROTOCOLS = "protocols";
+//    // - value名称
+//    private static final String AM_INIT_INFO_TABLE_VALUE_NAME = "am_init_value";
+//
+//    // am合约「上层协议合约信息表」：记录上层协议类型到协议合约账户的映射
+//    // - 表名
+//    private static final String AM_PROTOCOLS_TABLE = "protocols";
+//    // - 主键的key格式：protocol类型  e.g. 0 (sdp)
+//    private static final String AM_PROTOCOLS_TABLE_KEY_FORMAT = "%s";
+//    private static final String AM_PROTOCOLS_TABLE_KEY_SDP = "0";
+//    // - value名称
+//    private static final String AM_PROTOCOLS_TABLE_VALUE_NAME = "protocol_account";
 
     // todo: unuse (插件不提供addrelayer功能！！！)
     // todo: eos运维人员应当提前使用中继账号在eos链上部署am合约，或由运维人员手动调用`addrelayer`将中继账户添加到am合约中
@@ -137,6 +163,7 @@ public class EosBBCService implements IBBCService {
     private static final String AM_ADD_RELAYER_ACTION = "addrelayer";
     // - 参数格式
     private static final String AM_ADD_RELAYER_PARAMETER_FORMAT = "{\n" +
+            "  \"invoker\": \"%s\"\n" +
             "  \"relayer_account\": \"%s\"\n" +
             "}";
 
@@ -145,6 +172,7 @@ public class EosBBCService implements IBBCService {
     private static final String AM_SET_PROTOCOL_ACTION = "setprotocol";
     // - 参数格式
     private static final String AM_SET_PROTOCOL_PARAMETER_FORMAT = "{\n" +
+            "  \"invoker\": \"%s\"\n" +
             "  \"protocol_account\": \"%s\",\n" +
             "  \"protocol_type\": \"%s\"\n" + // 0 - sdp
             "}";
@@ -191,6 +219,7 @@ public class EosBBCService implements IBBCService {
      *     1. 插件连接eos
      *     2. 检查context中是否携带已部署合约信息（需要携带）
      * </pre>
+     *
      * @param abstractBBCContext
      */
     @Override
@@ -212,11 +241,11 @@ public class EosBBCService implements IBBCService {
             throw new RuntimeException(e);
         }
 
-        if(StrUtil.isEmpty(config.getUserPriKey())){
+        if (StrUtil.isEmpty(config.getUserPriKey())) {
             throw new RuntimeException("private key is empty");
         }
 
-        if(StrUtil.isEmpty(config.getUrl())){
+        if (StrUtil.isEmpty(config.getUrl())) {
             throw new RuntimeException("eos url is empty");
         }
 
@@ -261,7 +290,7 @@ public class EosBBCService implements IBBCService {
         this.bbcContext = abstractBBCContext;
 
         // 4. check the pre-deployed contracts into context
-        if (ObjectUtil.isNull(abstractBBCContext.getAuthMessageContract())){
+        if (ObjectUtil.isNull(abstractBBCContext.getAuthMessageContract())) {
             if (StrUtil.isEmpty(this.config.getAmContractAddressDeployed())) {
                 throw new RuntimeException(String.format("The am contract is not deployed"));
             } else {
@@ -294,11 +323,12 @@ public class EosBBCService implements IBBCService {
 
     /**
      * 返回上下文
+     *
      * @return
      */
     @Override
     public AbstractBBCContext getContext() {
-        if (ObjectUtil.isNull(this.bbcContext)){
+        if (ObjectUtil.isNull(this.bbcContext)) {
             throw new RuntimeException("empty bbc context");
         }
 
@@ -318,7 +348,7 @@ public class EosBBCService implements IBBCService {
     @Override
     public void setupAuthMessageContract() {
         // 1. check context
-        if (ObjectUtil.isNull(this.bbcContext)){
+        if (ObjectUtil.isNull(this.bbcContext)) {
             throw new RuntimeException("empty bbc context");
         }
         if (ObjectUtil.isNotNull(this.bbcContext.getAuthMessageContract())
@@ -337,7 +367,7 @@ public class EosBBCService implements IBBCService {
     @Override
     public void setupSDPMessageContract() {
         // 1. check context
-        if (ObjectUtil.isNull(this.bbcContext)){
+        if (ObjectUtil.isNull(this.bbcContext)) {
             throw new RuntimeException("empty bbc context");
         }
         if (ObjectUtil.isNotNull(this.bbcContext.getSdpContract())
@@ -380,10 +410,10 @@ public class EosBBCService implements IBBCService {
 
         // 2. Construct cross-chain message receipt
         Object receipt = null;
-        if(response != null){
+        if (response != null) {
             receipt = new JSONObject((Map) JSONObject.parseObject(response).get("trx")).get("receipt");
         }
-        if (receipt != null){
+        if (receipt != null) {
             String status = (String) new JSONObject((Map) receipt).get("status");
 
             crossChainMessageReceipt.setSuccessful(StrUtil.equals(EosTransactionStatusEnum.EXECUTED.getStatus(), status)
@@ -410,16 +440,17 @@ public class EosBBCService implements IBBCService {
      *     3. 获取每个交易中的action
      *     4. 如果action中包含跨链信息则取出
      * </pre>
+     *
      * @param height
      * @return
      */
     @Override
     public List<CrossChainMessage> readCrossChainMessagesByHeight(long height) {
-        if (ObjectUtil.isNull(this.bbcContext)){
+        if (ObjectUtil.isNull(this.bbcContext)) {
             throw new RuntimeException("empty bbc context");
         }
 
-        if (ObjectUtil.isNull(this.bbcContext.getAuthMessageContract())){
+        if (ObjectUtil.isNull(this.bbcContext.getAuthMessageContract())) {
             throw new RuntimeException("empty am contract in bbc context");
         }
 
@@ -431,14 +462,14 @@ public class EosBBCService implements IBBCService {
             List<Map> transactions = getBlockResponse.getTransactions();
 
             // 2. get crosschain msgs
-            for (Map txMap : transactions){
+            for (Map txMap : transactions) {
                 PackedTransaction packedTransaction = JSONObject.parseObject(
                         JSONObject.toJSONString(((Map) txMap.get("trx")).get("transaction")),
                         PackedTransaction.class);
 
-                for(TransactionAction action : packedTransaction.getActions()){
+                for (TransactionAction action : packedTransaction.getActions()) {
                     // todo: 如果这个action包含跨链事件标识
-                    if(StrUtil.equals(CROSSCHAIN_ACTION, action.getName())){
+                    if (StrUtil.equals(CROSSCHAIN_ACTION, action.getName())) {
                         messageList.add(
                                 CrossChainMessage.createCrossChainMessage(
                                         CrossChainMessage.CrossChainMessageType.AUTH_MSG,
@@ -460,7 +491,7 @@ public class EosBBCService implements IBBCService {
 
             System.out.printf("read cross chain messages (height: %d, msgs: \n\t%s)\n",
                     height,
-                    String.join("\n\t", messageList.stream().map(m->JSON.toJSONString(m)).collect(Collectors.toList()))
+                    String.join("\n\t", messageList.stream().map(m -> JSON.toJSONString(m)).collect(Collectors.toList()))
             );
 
             return messageList;
@@ -478,6 +509,7 @@ public class EosBBCService implements IBBCService {
 
     /**
      * 获取最新区块高度
+     *
      * @return
      */
     @Override
@@ -502,6 +534,7 @@ public class EosBBCService implements IBBCService {
      *
      *     todo:补充单测
      * </pre>
+     *
      * @param senderDomain
      * @param senderID
      * @param receiverDomain
@@ -511,28 +544,38 @@ public class EosBBCService implements IBBCService {
     @Override
     public long querySDPMessageSeq(String senderDomain, String senderID, String receiverDomain, String receiverID) {
         // 1. check context
-        if (ObjectUtil.isNull(this.bbcContext)){
+        if (ObjectUtil.isNull(this.bbcContext)) {
             throw new RuntimeException("empty bbc context");
         }
-        if (ObjectUtil.isNull(this.bbcContext.getSdpContract())){
+        if (ObjectUtil.isNull(this.bbcContext.getSdpContract())) {
             throw new RuntimeException("empty sdp contract in bbc context");
         }
 
         // 2. 读合约数据
-        long seq = (long)bbcGetValueFromTableByKeyOnRpc(
-                config.getSdpContractAddressDeployed(),
-                config.getSdpContractAddressDeployed(),
-                SDP_MSG_SEQ_TABLE,
-                String.format(
-                        SDP_MSG_SEQ_TABLE_KEY_FORMAT,
-                        senderDomain,
-                        senderID,
-                        receiverDomain,
-                        receiverID),
-                SDP_MSG_SEQ_TABLE_VALUE_NAME
-        );
+//        long seq = (long)bbcGetValueFromTableByKeyOnRpc(
+//                config.getSdpContractAddressDeployed(),
+//                config.getSdpContractAddressDeployed(),
+//                SDP_MSG_SEQ_TABLE,
+//                stringToLong(String.format(
+//                        SDP_MSG_SEQ_TABLE_KEY_FORMAT,
+//                        senderDomain,
+//                        senderID,
+//                        receiverDomain,
+//                        receiverID)),
+//                SDP_MSG_SEQ_TABLE_VALUE_NAME
+//        );
+        long seq = 0;
 
         return seq;
+    }
+
+    private long stringToLong(String str) {
+        byte[] data = str.getBytes();
+        long result = 0;
+        for (int i = 0; i < data.length; i++) {
+            result |= ((long) (data[i] & 0xff)) << (8 * i);
+        }
+        return result;
     }
 
     /**
@@ -545,6 +588,7 @@ public class EosBBCService implements IBBCService {
      *
      *     todo:补充单测
      * </pre>
+     *
      * @param protocolAddress
      * @param protocolType
      */
@@ -554,7 +598,7 @@ public class EosBBCService implements IBBCService {
         if (ObjectUtil.isNull(this.bbcContext)) {
             throw new RuntimeException("empty bbc context");
         }
-        if (ObjectUtil.isNull(this.bbcContext.getAuthMessageContract())){
+        if (ObjectUtil.isNull(this.bbcContext.getAuthMessageContract())) {
             throw new RuntimeException("empty am contract in bbc context");
         }
 
@@ -572,7 +616,7 @@ public class EosBBCService implements IBBCService {
 
         // 3. check transaction
         if (StrUtil.equals(EosTransactionStatusEnum.EXECUTED.getStatus(), txStatus)
-                || StrUtil.equals(EosTransactionStatusEnum.DELAYED.getStatus(), txStatus)){
+                || StrUtil.equals(EosTransactionStatusEnum.DELAYED.getStatus(), txStatus)) {
             System.out.printf(
                     "set protocol (address: %s, type: %s) to AM %s%n by tx %s \n",
                     protocolAddress,
@@ -586,15 +630,15 @@ public class EosBBCService implements IBBCService {
 
         // 4. check if am is ready
         try {
-            if(isAmReady()){
+            if (isAmReady()) {
                 this.bbcContext.getAuthMessageContract().setStatus(ContractStatusEnum.CONTRACT_READY);
             }
         } catch (Exception e) {
             throw new RuntimeException(
-                String.format(
-                    "failed to update am contract status (address: %s)",
-                    this.bbcContext.getAuthMessageContract().getContractAddress()
-                ), e);
+                    String.format(
+                            "failed to update am contract status (address: %s)",
+                            this.bbcContext.getAuthMessageContract().getContractAddress()
+                    ), e);
         }
     }
 
@@ -604,21 +648,26 @@ public class EosBBCService implements IBBCService {
      *     1. 中继账户名称已初始化
      *     2. 指定类型的上层协议合约名称已初始化
      * </pre>
+     *
      * @return
      */
     private boolean isAmReady() {
-        return ((String[]) bbcGetValueFromTableByKeyOnRpc(
-                this.bbcContext.getAuthMessageContract().getContractAddress(),
-                this.bbcContext.getAuthMessageContract().getContractAddress(),
-                AM_INIT_INFO_TABLE,
-                AM_INIT_INFO_TABLE_KEY_RELAYERS,
-                AM_INIT_INFO_TABLE_VALUE_NAME)).length > 0
-            && ((String[]) bbcGetValueFromTableByKeyOnRpc(
-                this.bbcContext.getAuthMessageContract().getContractAddress(),
-                this.bbcContext.getAuthMessageContract().getContractAddress(),
-                AM_INIT_INFO_TABLE,
-                AM_INIT_INFO_TABLE_KEY_PROTOCOLS,
-                AM_INIT_INFO_TABLE_VALUE_NAME)).length > 0;
+//        return ((String[]) bbcGetValueFromTableOnRpc(
+//                this.bbcContext.getAuthMessageContract().getContractAddress(),
+//                this.bbcContext.getAuthMessageContract().getContractAddress(),
+//                AM_RELAYER_INFO_TABLE,
+//                String.format(AM_RELAYER_KEY_FORMAT),
+//
+//                AM_INIT_INFO_TABLE,
+//                AM_INIT_INFO_TABLE_KEY_RELAYERS,
+//                AM_INIT_INFO_TABLE_VALUE_NAME)).length > 0
+//            && ((String[]) bbcGetValueFromTableByKeyOnRpc(
+//                this.bbcContext.getAuthMessageContract().getContractAddress(),
+//                this.bbcContext.getAuthMessageContract().getContractAddress(),
+//                AM_INIT_INFO_TABLE,
+//                AM_INIT_INFO_TABLE_KEY_PROTOCOLS,
+//                AM_INIT_INFO_TABLE_VALUE_NAME)).length > 0;
+        return true;
     }
 
     /**
@@ -631,6 +680,7 @@ public class EosBBCService implements IBBCService {
      *
      *     todo:补充单测
      * </pre>
+     *
      * @param contractAddress
      */
     @Override
@@ -692,6 +742,7 @@ public class EosBBCService implements IBBCService {
      *
      *     todo:补充单测
      * </pre>
+     *
      * @param domain
      */
     @Override
@@ -749,25 +800,28 @@ public class EosBBCService implements IBBCService {
      *     1. am信息已经初始化
      *     2. localdomain信息已经初始化
      * </pre>
+     *
      * @return
      */
     private boolean isSdpReady() {
-        return StrUtil.isNotEmpty((String) bbcGetValueFromTableByKeyOnRpc(
-                this.bbcContext.getSdpContract().getContractAddress(),
-                this.bbcContext.getSdpContract().getContractAddress(),
-                SDP_INIT_INFO_TABLE,
-                SDP_INIT_INFO_TABLE_KEY_AM,
-                SDP_INIT_INFO_TABLE_VALUE_NAME))
-            && StrUtil.isNotEmpty((String) bbcGetValueFromTableByKeyOnRpc(
-                this.bbcContext.getSdpContract().getContractAddress(),
-                this.bbcContext.getSdpContract().getContractAddress(),
-                SDP_INIT_INFO_TABLE,
-                SDP_INIT_INFO_TABLE_KEY_LOCALDOMAIN,
-                SDP_INIT_INFO_TABLE_VALUE_NAME));
+//        return StrUtil.isNotEmpty((String) bbcGetValueFromTableByKeyOnRpc(
+//                this.bbcContext.getSdpContract().getContractAddress(),
+//                this.bbcContext.getSdpContract().getContractAddress(),
+//                SDP_INIT_INFO_TABLE,
+//                SDP_INIT_INFO_TABLE_KEY_AM,
+//                SDP_INIT_INFO_TABLE_VALUE_NAME))
+//            && StrUtil.isNotEmpty((String) bbcGetValueFromTableByKeyOnRpc(
+//                this.bbcContext.getSdpContract().getContractAddress(),
+//                this.bbcContext.getSdpContract().getContractAddress(),
+//                SDP_INIT_INFO_TABLE,
+//                SDP_INIT_INFO_TABLE_KEY_LOCALDOMAIN,
+//                SDP_INIT_INFO_TABLE_VALUE_NAME));
+        return true; // todo
     }
 
     /**
      * 调用AM合约方法将中继消息转发到接收链
+     *
      * @param rawMessage
      * @return
      */
@@ -777,7 +831,7 @@ public class EosBBCService implements IBBCService {
         if (ObjectUtil.isNull(this.bbcContext)) {
             throw new RuntimeException("empty bbc context");
         }
-        if (ObjectUtil.isNull(this.bbcContext.getAuthMessageContract())){
+        if (ObjectUtil.isNull(this.bbcContext.getAuthMessageContract())) {
             throw new RuntimeException("empty am contract in bbc context");
         }
 
@@ -820,6 +874,7 @@ public class EosBBCService implements IBBCService {
 
     /**
      * 合约工具方法：发送异步交易调用合约方法，可以一次调用多个合约
+     *
      * @param invokeParams
      * @return
      */
@@ -827,7 +882,7 @@ public class EosBBCService implements IBBCService {
         List<Action> actionList = new ArrayList<>();
 
         for (String[] infos : invokeParams) {
-            if(infos.length != 3){
+            if (infos.length != 3) {
                 throw new RuntimeException(String.format(
                         "the parameters length shouled be 3 but %s", infos.length));
             }
@@ -862,10 +917,11 @@ public class EosBBCService implements IBBCService {
 
     /**
      * 合约工具方法：根据交易哈希查询交易回执状态
+     *
      * @param txHash
      * @return
      */
-    private String bbcGetStatusByTransactionHashOnRpc(String txHash){
+    private String bbcGetStatusByTransactionHashOnRpc(String txHash) {
         String getTransactionRequest = String.format("{\n" +
                 "\t\"id\": \"%s\",\n" +
                 "}", txHash);
@@ -884,11 +940,11 @@ public class EosBBCService implements IBBCService {
         }
 
         Object receipt = null;
-        if(response != null){
+        if (response != null) {
             receipt = new JSONObject((Map) JSONObject.parseObject(response).get("trx")).get("receipt");
         }
 
-        if (receipt != null){
+        if (receipt != null) {
             return (String) new JSONObject((Map) receipt).get("status");
         } else {
             return EosTransactionStatusEnum.UNKNOW.getStatus();
@@ -897,15 +953,16 @@ public class EosBBCService implements IBBCService {
 
     /**
      * 合约工具方法：读取合约存储表格数据
+     *
      * @param contractAcc
      * @param tableScope
      * @param tableName
-     * @param tableKey
+     * @param tableKey    主键值必须为uint64
      * @param valueName
      * @return
      */
     private Object bbcGetValueFromTableByKeyOnRpc(
-            String contractAcc, String tableScope, String tableName, String tableKey, String valueName){
+            String contractAcc, String tableScope, String tableName, String tableKey, String valueName) {
         // 1. 构造rpc请求
         String getTableRowsRequest = String.format("{\n" +
                         // 合约账户
@@ -931,7 +988,7 @@ public class EosBBCService implements IBBCService {
         String response = null;
         try {
             response = rpcProvider.getTableRows(requestBody);
-        } catch (RpcProviderError  | RuntimeException e) {
+        } catch (RpcProviderError | RuntimeException e) {
             throw new RuntimeException(
                     String.format(
                             "failed to invoke getTableRows rpc (req: %s)", getTableRowsRequest
@@ -947,7 +1004,56 @@ public class EosBBCService implements IBBCService {
     }
 
     /**
+     * 合约工具方法：读取合约存储表格数据
+     *
+     * @param contractAcc
+     * @param tableScope
+     * @param tableName
+     * @param valueName
+     * @return
+     */
+    private Object bbcGetValueFromTableOnRpc(
+            String contractAcc, String tableScope, String tableName, String valueName) {
+        // 1. 构造rpc请求
+        String getTableRowsRequest = String.format("{\n" +
+                        // 合约账户
+                        "\t\"code\": \"%s\",\n" +
+                        // 表的范围，一般和合约账户相同
+                        "\t\"scope\": \"%s\",\n" +
+                        // 表名称
+                        "\t\"table\": \"%s\",\n" +
+                        // 结果用json编码
+                        "\t\"json\": true\n" +
+                        "}",
+                contractAcc,
+                tableScope,
+                tableName);
+        RequestBody requestBody = RequestBody.create(okhttp3.MediaType.parse("application/json; charset=utf-8"),
+                getTableRowsRequest);
+
+        // 2. 发送rpc请求
+        String response = null;
+        try {
+            response = rpcProvider.getTableRows(requestBody);
+        } catch (RpcProviderError | RuntimeException e) {
+            throw new RuntimeException(
+                    String.format(
+                            "failed to invoke getTableRows rpc (req: %s)", getTableRowsRequest
+                    ), e
+            );
+        }
+
+        // 3. 解析rpc结果，返回结果应当只有0或1行的数据，根据value名称返回value值
+        return JSON.parseObject(response)
+                .getJSONArray("rows")
+                .getJSONObject(0)
+                .get(valueName);
+    }
+
+
+    /**
      * 测试demo: 合约调用
+     *
      * @return
      */
     public boolean demoInvokeHello() {
@@ -955,7 +1061,7 @@ public class EosBBCService implements IBBCService {
         if (ObjectUtil.isNull(this.bbcContext)) {
             throw new RuntimeException("empty bbc context");
         }
-        if (ObjectUtil.isNull(this.bbcContext.getAuthMessageContract())){
+        if (ObjectUtil.isNull(this.bbcContext.getAuthMessageContract())) {
             throw new RuntimeException("empty am contract in bbc context");
         }
 
@@ -971,7 +1077,7 @@ public class EosBBCService implements IBBCService {
         String txId = sendTransactionResponse.getTransactionId();
         String txStatus = bbcGetStatusByTransactionHashOnRpc(txId);
         if (StrUtil.equals(EosTransactionStatusEnum.EXECUTED.getStatus(), txStatus)
-                || StrUtil.equals(EosTransactionStatusEnum.DELAYED.getStatus(), txStatus)){
+                || StrUtil.equals(EosTransactionStatusEnum.DELAYED.getStatus(), txStatus)) {
             return true;
         } else {
             return false;
@@ -980,6 +1086,7 @@ public class EosBBCService implements IBBCService {
 
     /**
      * 测试demo: 数据读写
+     *
      * @return
      */
     public int demoInvokeSetData() {
@@ -987,7 +1094,7 @@ public class EosBBCService implements IBBCService {
         if (ObjectUtil.isNull(this.bbcContext)) {
             throw new RuntimeException("empty bbc context");
         }
-        if (ObjectUtil.isNull(this.bbcContext.getAuthMessageContract())){
+        if (ObjectUtil.isNull(this.bbcContext.getAuthMessageContract())) {
             throw new RuntimeException("empty am contract in bbc context");
         }
 
@@ -998,7 +1105,7 @@ public class EosBBCService implements IBBCService {
                                 config.getGetDataContractAddressDeployed(),
                                 "setdata",
                                 "{\n" +
-                                        "  \"sender\": \""+ config.getUserName() +"\",\n" +
+                                        "  \"sender\": \"" + config.getUserName() + "\",\n" +
                                         "  \"data_name\": \"data1\",\n" +
                                         "  \"data_value\": \"10\"\n" +
                                         "}",
@@ -1007,14 +1114,14 @@ public class EosBBCService implements IBBCService {
         String txId = sendTransactionResponse.getTransactionId();
         String txStatus = bbcGetStatusByTransactionHashOnRpc(txId);
         if (StrUtil.equals(EosTransactionStatusEnum.EXECUTED.getStatus(), txStatus)
-                || StrUtil.equals(EosTransactionStatusEnum.DELAYED.getStatus(), txStatus)){
+                || StrUtil.equals(EosTransactionStatusEnum.DELAYED.getStatus(), txStatus)) {
 
         } else {
             throw new RuntimeException(String.format("fail to invoke set data by send transaction %s", txId));
         }
 
         // 3. 读数据
-        int getInfoResponse = (int)bbcGetValueFromTableByKeyOnRpc(
+        int getInfoResponse = (int) bbcGetValueFromTableByKeyOnRpc(
                 config.getGetDataContractAddressDeployed(),
                 config.getGetDataContractAddressDeployed(),
                 "datas",

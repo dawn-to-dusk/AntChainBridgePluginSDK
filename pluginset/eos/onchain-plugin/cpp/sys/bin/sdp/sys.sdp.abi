@@ -1,0 +1,226 @@
+{
+    "____comment": "This file was generated with eosio-abigen. DO NOT EDIT ",
+    "version": "eosio::abi/1.2",
+    "types": [],
+    "structs": [
+        {
+            "name": "counttable",
+            "base": "",
+            "fields": [
+                {
+                    "name": "count",
+                    "type": "uint64"
+                }
+            ]
+        },
+        {
+            "name": "init",
+            "base": "",
+            "fields": [
+                {
+                    "name": "initializer",
+                    "type": "name"
+                }
+            ]
+        },
+        {
+            "name": "recvmsg",
+            "base": "",
+            "fields": [
+                {
+                    "name": "invoker",
+                    "type": "name"
+                },
+                {
+                    "name": "sender_domain",
+                    "type": "string"
+                },
+                {
+                    "name": "sender_id",
+                    "type": "name"
+                },
+                {
+                    "name": "pkg",
+                    "type": "string"
+                }
+            ]
+        },
+        {
+            "name": "s_sdpinitinfo",
+            "base": "",
+            "fields": [
+                {
+                    "name": "sdp_init_key",
+                    "type": "uint64"
+                },
+                {
+                    "name": "am_contract_account",
+                    "type": "name"
+                },
+                {
+                    "name": "local_domain",
+                    "type": "string"
+                }
+            ]
+        },
+        {
+            "name": "s_sdpmsgseq",
+            "base": "",
+            "fields": [
+                {
+                    "name": "sdp_msg_count",
+                    "type": "uint64"
+                },
+                {
+                    "name": "sdp_msg_key",
+                    "type": "checksum256"
+                },
+                {
+                    "name": "sdp_msg_seq",
+                    "type": "uint32"
+                }
+            ]
+        },
+        {
+            "name": "sendmsg",
+            "base": "",
+            "fields": [
+                {
+                    "name": "invoker",
+                    "type": "name"
+                },
+                {
+                    "name": "receiver_domain",
+                    "type": "string"
+                },
+                {
+                    "name": "receiver_id",
+                    "type": "name"
+                },
+                {
+                    "name": "msg",
+                    "type": "string"
+                }
+            ]
+        },
+        {
+            "name": "sendunmsg",
+            "base": "",
+            "fields": [
+                {
+                    "name": "invoker",
+                    "type": "name"
+                },
+                {
+                    "name": "receiver_domain",
+                    "type": "string"
+                },
+                {
+                    "name": "receiver_id",
+                    "type": "name"
+                },
+                {
+                    "name": "msg",
+                    "type": "string"
+                }
+            ]
+        },
+        {
+            "name": "setam",
+            "base": "",
+            "fields": [
+                {
+                    "name": "invoker",
+                    "type": "name"
+                },
+                {
+                    "name": "am_contract_account",
+                    "type": "name"
+                }
+            ]
+        },
+        {
+            "name": "setdomain",
+            "base": "",
+            "fields": [
+                {
+                    "name": "invoker",
+                    "type": "name"
+                },
+                {
+                    "name": "local_domain",
+                    "type": "string"
+                }
+            ]
+        },
+        {
+            "name": "test1",
+            "base": "",
+            "fields": []
+        }
+    ],
+    "actions": [
+        {
+            "name": "init",
+            "type": "init",
+            "ricardian_contract": ""
+        },
+        {
+            "name": "recvmsg",
+            "type": "recvmsg",
+            "ricardian_contract": ""
+        },
+        {
+            "name": "sendmsg",
+            "type": "sendmsg",
+            "ricardian_contract": ""
+        },
+        {
+            "name": "sendunmsg",
+            "type": "sendunmsg",
+            "ricardian_contract": ""
+        },
+        {
+            "name": "setam",
+            "type": "setam",
+            "ricardian_contract": ""
+        },
+        {
+            "name": "setdomain",
+            "type": "setdomain",
+            "ricardian_contract": ""
+        },
+        {
+            "name": "test1",
+            "type": "test1",
+            "ricardian_contract": ""
+        }
+    ],
+    "tables": [
+        {
+            "name": "counttable",
+            "type": "counttable",
+            "index_type": "i64",
+            "key_names": [],
+            "key_types": []
+        },
+        {
+            "name": "sdpinitinfo",
+            "type": "s_sdpinitinfo",
+            "index_type": "i64",
+            "key_names": [],
+            "key_types": []
+        },
+        {
+            "name": "sdpmsgseq",
+            "type": "s_sdpmsgseq",
+            "index_type": "i64",
+            "key_names": [],
+            "key_types": []
+        }
+    ],
+    "kv_tables": {},
+    "ricardian_clauses": [],
+    "variants": [],
+    "action_results": []
+}
